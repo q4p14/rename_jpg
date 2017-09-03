@@ -3,6 +3,8 @@ Param ($source,$dest,$delsrc)
 # Add the .NET Framework Class System.Drawing to the PowerShell Session
 Add-Type -AssemblyName System,System.Drawing
 
+$datecurrent = Get-Date -Format "yyyy-MM-dd_hh-mm-ss"
+
 # Read the destination and source from CLI if the weren't already
 # specified
 if(!$source){
@@ -35,17 +37,17 @@ Get-ChildItem -Path "$source" -Recurse -Filter *.jpg | ForEach-Object {
     # Get the images date values with a built in method, select from
     # index 0 to 9
     $imagedate = $imagefile.GetPropertyItem(36867).Value[0..18]
-    
+
     # Get the values for year, month and day from the corresponding positions
     # in the $imagedate array and cast them to the char type
     $dateyear = [Char]$imagedate[0]+[Char]$imagedate[1]+[Char]$imagedate[2]+`
     [Char]$imagedate[3]
     $datemonth = [Char]$imagedate[5]+[Char]$imagedate[6]
     $dateday = [Char]$imagedate[8]+[Char]$imagedate[9]
-    
+
     # Construct the $datetaken meta data variable
     $datetaken = "$dateyear" + "." + "$datemonth" + "." + "$dateday"
-    
+
     # In case the destination already exists with a certain event, this
     # has to be catched
     $copydest = Get-ChildItem -Path $dest\* -Filter "$datetaken*"
@@ -76,14 +78,14 @@ Get-ChildItem -Path "$source" -Recurse -Filter *.jpg | ForEach-Object {
     # Construct the $datetaken meta data variable
     $timetaken = "$datehour" + "." + "$dateminute" + "." + "$datesecond"
 
-    #$lockp = CMD /C "openfiles /query /fo table | find /I """"" 
+    #$lockp = CMD /C "openfiles /query /fo table | find /I """""
     #Write-Host $lockp
 
     # Copy the photo to the destination
     Copy-Item -Path $_.FullName -Destination $copydest
 
     # Rename files to a temporary file name
-    Rename-Item -Path "$copydest\$_" -NewName "$counter_$timetaken.jpg"
+    Rename-Item -Path "$copydest\$_" -NewName "$counter $datecurrent $timetaken.jpg"
 
     # Increment the counter for renaming
     $counter++
@@ -94,14 +96,23 @@ Get-ChildItem -Path "$source" -Recurse -Filter *.jpg | ForEach-Object {
 Get-ChildItem -Path "$dest\*" | ForEach-Object {
     # Reset the renaming index counter
     $counter = 0
-    # Get all images in the current folder and start renaming them 
-    Get-ChildItem -Path $_ | ForEach-Object {
+    # Get all images in the current folder and start renaming them
+    Get-ChildItem -Path $_ | Where-Object {$_.Name -match "^[0-9]+\s$datecurrent\s"}`
+    | ForEach-Object {
         # Get the pure name of the file without the temporary index
-        $newname = $_.Name -replace "^[0-9]+\s",''
+        $newname = $_.Name -replace "^[0-9]+\s$datecurrent\s",''
+        $tmppath = $_.FullName -replace "$_.Name","Nr$counter $newname"
         # Rename the current file to get the new index in front of the name
-        Rename-Item -Path $_.FullName -NewName "Nr$counter-$newname"
+        if(Test-Path $tmppath) {
+            Rename-Item -Path $_.FullName -NewName "Nr$counter $datecurrent $newname"
+            Write-Host "Duplicate files detected, renaming files to current date"
+        }else{
+            Rename-Item -Path $_.FullName -NewName "Nr$counter $newname"
+            Write-Host "Test"
+        }
+
         # Increment the counter
-        $counter++ 
+        $counter++
     }
 }
 
